@@ -30,6 +30,10 @@ class DataService:
             sep=' '
         ).iloc[:, :-1] # Because this file contains whitespaces at the end of each row
 
+    def reset_service(self) -> None:
+        self.summary_data = None
+        self.feature_data = None
+
 
 class Zonation5LoaderPlugin:
     def __init__(self, iface):
@@ -48,10 +52,10 @@ class Zonation5LoaderPlugin:
         del self.action
 
     def show_dialog(self):
-        if not self.dialog:
-            self.dialog = Z5RankmapLoaderDialog(self.iface, self.data_service)
-        elif (self.data_service.feature_data is not None) & (self.data_service.summary_data is not None):
+        if (self.data_service.feature_data is not None) & (self.data_service.summary_data is not None):
             self.dialog = Z5PerformanceCurvesDialog(self.iface, self.data_service)
+        else:
+            self.dialog = Z5RankmapLoaderDialog(self.iface, self.data_service)
         self.dialog.show()
 
 
@@ -101,7 +105,6 @@ class Z5RankmapLoaderDialog(QDialog):
             self.z5_output_path = None
             self.open_button.setEnabled(False)
             self.destroy()
-            self = Z5PerformanceCurvesDialog(self.iface, self.data_service)
         else:
             self.iface.messageBar().pushCritical('Error', 'Invalid rankmap layer')
 
@@ -145,4 +148,13 @@ class Z5PerformanceCurvesDialog(QDialog):
         curves_area = FigureCanvas(curves_figure_canvas)
         layout.addWidget(curves_area)
 
+        reset_button = QPushButton('Reset')
+        reset_button.clicked.connect(self._reset_curves)
+        layout.addWidget(reset_button)
+
         self.setLayout(layout)
+
+    def _reset_curves(self):
+        self.data_service.reset_service()
+        self.iface.messageBar().pushSuccess('Success', 'Performance curves reset')
+        self.destroy()

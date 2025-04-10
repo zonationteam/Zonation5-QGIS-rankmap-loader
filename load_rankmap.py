@@ -2,7 +2,6 @@ import os
 import inspect
 from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QSettings, Qt
 from qgis.core import QgsRasterLayer, QgsProject
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
@@ -34,6 +33,7 @@ class Z5RankmapLoaderDialog(QDialog):
         self.iface = iface
         self.is_running = False
         self.z5_output_path = None
+        self.open_button = None
         self.init_ui()
 
     def init_ui(self):
@@ -64,13 +64,14 @@ class Z5RankmapLoaderDialog(QDialog):
         self.open_button.setEnabled(True)
 
     def run(self):
-
-        self.iface.messageBar().pushMessage('Hello from Plugin')
-        self.destroy()
-        # rankmap_path = 'rankmap.tif'
-        # rlayer = QgsRasterLayer(rankmap_path, 'rankmap')
-        # if rlayer.isValid():
-        #     QgsProject.instance().addMapLayer(rlayer)
-        #     self.iface.messageBar().pushSuccess('Success', 'Rankmap Loaded')
-        # else:
-        #     self.iface.messageBar().pushCritical('Error', 'Invalid Rankmap Layer')
+        rankmap_path = f'{self.z5_output_path}/rankmap.tif'
+        rlayer = QgsRasterLayer(rankmap_path, 'rankmap')
+        if rlayer.isValid():
+            QgsProject.instance().addMapLayer(rlayer)
+            QgsProject.instance().setCrs(rlayer.crs())
+            self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
+            self.z5_output_path = None
+            self.open_button.setEnabled(False)
+            self.destroy()
+        else:
+            self.iface.messageBar().pushCritical('Error', 'Invalid rankmap layer')

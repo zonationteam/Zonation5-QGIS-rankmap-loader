@@ -4,12 +4,38 @@ from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, 
 from PyQt5.QtGui import QIcon
 from qgis.core import QgsRasterLayer, QgsProject
 
+import pandas as pd
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib import pyplot as plt, ticker
+
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
+
+class DataService:
+    def __init__(self) -> None:
+        self.summary_data = None
+        self.feature_data = None
+
+    def __str__(self) -> str:
+        sum_data_line = f"Summary data:\n{str(self.summary_data.head(2))}"
+        feat_data_line = f"Feature data:\n{str(self.feature_data.head(2))}"
+        return f"{sum_data_line},\n{feat_data_line}\n"
+
+    def set_output_folder(self, outputfolder_path: str) -> None:
+        self.summary_data = pd.read_csv(
+            f"{outputfolder_path}/summary_curves.csv",
+            sep=' '
+        )
+        self.feature_data = pd.read_csv(
+            f"{outputfolder_path}/feature_curves.csv",
+            sep=' '
+        ).iloc[:, :-1] # Because this file contains whitespaces at the end of each row
+
 
 class Zonation5LoaderPlugin:
     def __init__(self, iface):
         self.iface = iface
         self.dialog = None
+        self.data_service = DataService()
 
     def initGui(self):
         icon = os.path.join(os.path.join(cmd_folder, 'icon.ico'))
@@ -23,15 +49,17 @@ class Zonation5LoaderPlugin:
 
     def show_dialog(self):
         if not self.dialog:
-            self.dialog = Z5RankmapLoaderDialog(self.iface)
+            self.dialog = Z5RankmapLoaderDialog(self.iface, self.data_service)
+        else:
+            self.dialog = Z5PerformanceCurvesDialog(self.iface, self.data_service)
         self.dialog.show()
 
 
 class Z5RankmapLoaderDialog(QDialog):
-    def __init__(self, iface):
+    def __init__(self, iface, data_service):
         super().__init__()
         self.iface = iface
-        self.is_running = False
+        self.data_service = data_service
         self.z5_output_path = None
         self.open_button = None
         self.init_ui()
@@ -68,10 +96,53 @@ class Z5RankmapLoaderDialog(QDialog):
         rlayer = QgsRasterLayer(rankmap_path, 'rankmap')
         if rlayer.isValid():
             QgsProject.instance().addMapLayer(rlayer)
-            QgsProject.instance().setCrs(rlayer.crs())
+            self.data_service.set_output_folder(self.z5_output_path)
             self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
             self.z5_output_path = None
             self.open_button.setEnabled(False)
             self.destroy()
+            self = Z5PerformanceCurvesDialog(self.iface, self.data_service)
         else:
             self.iface.messageBar().pushCritical('Error', 'Invalid rankmap layer')
+
+
+class Z5PerformanceCurvesDialog(QDialog):
+    def __init__(self, iface, data_service):
+        super().__init__()
+        self.iface = iface
+        self.data_service = data_service
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Performance curves')
+
+        layout = QVBoxLayout()
+
+        curves_figure_canvas = plt.Figure(figsize=(8,6), dpi=100)
+        ax_curves = curves_figure_canvas.add_subplot(111)
+        feature_line, *_ = ax_curves.plot(
+            self.data_service.feature_data['rank'],
+            self.data_service.feature_data.iloc[:, 1:],
+            color='lightblue',
+            label='Feature curves'
+        )
+        summary_line, = ax_curves.plot(
+            self.data_service.summary_data['rank'],
+            self.data_service.summary_data['mean'],
+            color='blue',
+            label='Summary curve, mean'
+        )
+        ax_curves.legend(handles=[summary_line, feature_line])
+        ax_curves.grid(True, alpha=0.3)
+        ax_curves.set_xlabel('Priority rank')
+        ax_curves.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
+        ax_curves.xaxis.set_minor_locator(ticker.MultipleLocator(0.05))
+        ax_curves.set_ylabel('Coverage of features')
+        ax_curves.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
+        ax_curves.yaxis.set_minor_locator(ticker.MultipleLocator(0.05))
+        ax_curves.set_title('Performance curves')
+
+        curves_area = FigureCanvas(curves_figure_canvas)
+        layout.addWidget(curves_area)
+
+        self.setLayout(layout)

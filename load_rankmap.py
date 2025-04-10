@@ -50,7 +50,7 @@ class Zonation5LoaderPlugin:
     def show_dialog(self):
         if not self.dialog:
             self.dialog = Z5RankmapLoaderDialog(self.iface, self.data_service)
-        else:
+        elif (self.data_service.feature_data is not None) & (self.data_service.summary_data is not None):
             self.dialog = Z5PerformanceCurvesDialog(self.iface, self.data_service)
         self.dialog.show()
 

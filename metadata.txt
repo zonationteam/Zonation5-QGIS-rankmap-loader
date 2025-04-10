@@ -1,5 +1,5 @@
 [general]
-name=Zonation 5 Loader
+name=Zonation 5 Rankmap Loader
 description=This plugin adds Zonation 5 output rankmap as a layer and show associated performance curves in QGIS.
 version=0.1
 qgisMinimumVersion=3.0

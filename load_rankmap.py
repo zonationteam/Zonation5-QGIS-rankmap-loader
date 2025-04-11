@@ -59,6 +59,9 @@ class Zonation5LoaderPlugin:
         self.iface.removeToolBarIcon(self.action)
         del self.action
 
+    def on_rankmap_destroyed(self):
+        self.output_data.reset_data()
+
     def show_dialog(self):
         if (
             (self.output_data.rankmap is not None) &
@@ -67,15 +70,16 @@ class Zonation5LoaderPlugin:
         ):
             self.dialog = Z5PerformanceCurvesDialog(self.iface, self.output_data)
         else:
-            self.dialog = Z5RankmapLoaderDialog(self.iface, self.output_data)
+            self.dialog = Z5RankmapLoaderDialog(self.iface, self.output_data, self.on_rankmap_destroyed)
         self.dialog.show()
 
 
 class Z5RankmapLoaderDialog(QDialog):
-    def __init__(self, iface, output_data):
+    def __init__(self, iface, output_data, on_rankmap_destroyed):
         super().__init__()
         self.iface = iface
         self.output_data = output_data
+        self.on_rankmap_destroyed = on_rankmap_destroyed
         self.z5_output_path = None
         self.open_button = None
         self.init_ui()
@@ -111,6 +115,7 @@ class Z5RankmapLoaderDialog(QDialog):
         self.output_data.set_output_folder(self.z5_output_path)
         if self.output_data.rankmap.isValid():
             QgsProject.instance().addMapLayer(self.output_data.rankmap)
+            self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
             self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
             self.z5_output_path = None
             self.open_button.setEnabled(False)
@@ -158,13 +163,4 @@ class Z5PerformanceCurvesDialog(QDialog):
         curves_area = FigureCanvas(curves_figure_canvas)
         layout.addWidget(curves_area)
 
-        reset_button = QPushButton('Reset')
-        reset_button.clicked.connect(self._reset_data)
-        layout.addWidget(reset_button)
-
         self.setLayout(layout)
-
-    def _reset_data(self):
-        self.output_data.reset_data()
-        self.iface.messageBar().pushSuccess('Success', 'Performance curves reset')
-        self.destroy()

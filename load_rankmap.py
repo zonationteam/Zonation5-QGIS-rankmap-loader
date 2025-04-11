@@ -10,8 +10,9 @@ from matplotlib import pyplot as plt, ticker
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 
-class DataService:
+class Z5OutputData:
     def __init__(self) -> None:
+        self.rankmap = None
         self.summary_data = None
         self.feature_data = None
 
@@ -20,7 +21,13 @@ class DataService:
         feat_data_line = f"Feature data:\n{str(self.feature_data.head(2))}"
         return f"{sum_data_line},\n{feat_data_line}\n"
 
-    def set_output_folder(self, outputfolder_path: str) -> None:
+    def set_output_folder(self, outputfolder_path: str, rankmap_name = '') -> None:
+        rlayer_name = 'rankmap'
+        if rankmap_name != '':
+            rlayer_name = f'{rlayer_name}_{rankmap_name}'
+        self.rankmap = QgsRasterLayer(f'{outputfolder_path}/rankmap.tif', rlayer_name)
+        if not self.rankmap.isValid():
+            return
         self.summary_data = pd.read_csv(
             f"{outputfolder_path}/summary_curves.csv",
             sep=' '
@@ -30,7 +37,8 @@ class DataService:
             sep=' '
         ).iloc[:, :-1] # Because this file contains whitespaces at the end of each row
 
-    def reset_service(self) -> None:
+    def reset_data(self) -> None:
+        self.rankmap = None
         self.summary_data = None
         self.feature_data = None
 
@@ -39,7 +47,7 @@ class Zonation5LoaderPlugin:
     def __init__(self, iface):
         self.iface = iface
         self.dialog = None
-        self.data_service = DataService()
+        self.output_data = Z5OutputData()
 
     def initGui(self):
         icon = os.path.join(os.path.join(cmd_folder, 'icon.ico'))
@@ -52,18 +60,22 @@ class Zonation5LoaderPlugin:
         del self.action
 
     def show_dialog(self):
-        if (self.data_service.feature_data is not None) & (self.data_service.summary_data is not None):
-            self.dialog = Z5PerformanceCurvesDialog(self.iface, self.data_service)
+        if (
+            (self.output_data.rankmap is not None) &
+            (self.output_data.summary_data is not None) &
+            (self.output_data.feature_data is not None)
+        ):
+            self.dialog = Z5PerformanceCurvesDialog(self.iface, self.output_data)
         else:
-            self.dialog = Z5RankmapLoaderDialog(self.iface, self.data_service)
+            self.dialog = Z5RankmapLoaderDialog(self.iface, self.output_data)
         self.dialog.show()
 
 
 class Z5RankmapLoaderDialog(QDialog):
-    def __init__(self, iface, data_service):
+    def __init__(self, iface, output_data):
         super().__init__()
         self.iface = iface
-        self.data_service = data_service
+        self.output_data = output_data
         self.z5_output_path = None
         self.open_button = None
         self.init_ui()
@@ -96,11 +108,9 @@ class Z5RankmapLoaderDialog(QDialog):
         self.open_button.setEnabled(True)
 
     def run(self):
-        rankmap_path = f'{self.z5_output_path}/rankmap.tif'
-        rlayer = QgsRasterLayer(rankmap_path, 'rankmap')
-        if rlayer.isValid():
-            QgsProject.instance().addMapLayer(rlayer)
-            self.data_service.set_output_folder(self.z5_output_path)
+        self.output_data.set_output_folder(self.z5_output_path)
+        if self.output_data.rankmap.isValid():
+            QgsProject.instance().addMapLayer(self.output_data.rankmap)
             self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
             self.z5_output_path = None
             self.open_button.setEnabled(False)
@@ -110,10 +120,10 @@ class Z5RankmapLoaderDialog(QDialog):
 
 
 class Z5PerformanceCurvesDialog(QDialog):
-    def __init__(self, iface, data_service):
+    def __init__(self, iface, output_data):
         super().__init__()
         self.iface = iface
-        self.data_service = data_service
+        self.output_data = output_data
         self.init_ui()
 
     def init_ui(self):
@@ -124,14 +134,14 @@ class Z5PerformanceCurvesDialog(QDialog):
         curves_figure_canvas = plt.Figure(figsize=(8,6), dpi=100)
         ax_curves = curves_figure_canvas.add_subplot(111)
         feature_line, *_ = ax_curves.plot(
-            self.data_service.feature_data['rank'],
-            self.data_service.feature_data.iloc[:, 1:],
+            self.output_data.feature_data['rank'],
+            self.output_data.feature_data.iloc[:, 1:],
             color='lightblue',
             label='Feature curves'
         )
         summary_line, = ax_curves.plot(
-            self.data_service.summary_data['rank'],
-            self.data_service.summary_data['mean'],
+            self.output_data.summary_data['rank'],
+            self.output_data.summary_data['mean'],
             color='blue',
             label='Summary curve, mean'
         )
@@ -149,12 +159,12 @@ class Z5PerformanceCurvesDialog(QDialog):
         layout.addWidget(curves_area)
 
         reset_button = QPushButton('Reset')
-        reset_button.clicked.connect(self._reset_curves)
+        reset_button.clicked.connect(self._reset_data)
         layout.addWidget(reset_button)
 
         self.setLayout(layout)
 
-    def _reset_curves(self):
-        self.data_service.reset_service()
+    def _reset_data(self):
+        self.output_data.reset_data()
         self.iface.messageBar().pushSuccess('Success', 'Performance curves reset')
         self.destroy()

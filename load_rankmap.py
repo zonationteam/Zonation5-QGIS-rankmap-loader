@@ -2,7 +2,7 @@ import os
 import inspect
 from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit
 from PyQt5.QtGui import QIcon
-from qgis.core import QgsRasterLayer, QgsProject
+from qgis.core import QgsRasterLayer, QgsProject, QgsMapLayerType
 
 import pandas as pd
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -46,39 +46,63 @@ class Z5OutputData:
 class Zonation5LoaderPlugin:
     def __init__(self, iface):
         self.iface = iface
+        self.icon = None
+        self.load_action = None
+        self.context_menu_action = None
         self.dialog = None
         self.output_data = Z5OutputData()
 
     def initGui(self):
-        icon = os.path.join(os.path.join(cmd_folder, 'icon.ico'))
-        self.action = QAction(QIcon(icon), 'Load Zonation 5 Rankmap', self.iface.mainWindow())
-        self.iface.addToolBarIcon(self.action)
-        self.action.triggered.connect(self.show_dialog)
+        self.icon = QIcon(os.path.join(os.path.join(cmd_folder, 'icon.ico')))
+
+        self.load_action = QAction(self.icon, 'Load Zonation 5 Rankmap', self.iface.mainWindow())
+        self.iface.addToolBarIcon(self.load_action)
+        self.load_action.triggered.connect(self.show_load_dialog)
+
+        self.context_menu_action = QAction(self.icon, 'Show performance curves')
+        self.iface.addCustomActionForLayerType(
+            self.context_menu_action,
+            'Zonation 5',
+            QgsMapLayerType.RasterLayer,
+            allLayers=True
+        )
+        self.context_menu_action.triggered.connect(self.show_curves_dialog)
+
 
     def unload(self):
-        self.iface.removeToolBarIcon(self.action)
-        del self.action
+        self.iface.removeToolBarIcon(self.load_action)
+        self.iface.removeCustomActionForLayerType(self.context_menu_action)
+        del self.load_action
+
+    def on_rankmap_added(self):
+        QgsProject.instance().addMapLayer(self.output_data.rankmap)
+        self.iface.addCustomActionForLayer(
+            QAction(self.icon, 'Show performance curves'),
+            self.output_data.rankmap
+        )
 
     def on_rankmap_destroyed(self):
         self.output_data.reset_data()
 
-    def show_dialog(self):
-        if (
-            (self.output_data.rankmap is not None) &
-            (self.output_data.summary_data is not None) &
-            (self.output_data.feature_data is not None)
-        ):
-            self.dialog = Z5PerformanceCurvesDialog(self.iface, self.output_data)
-        else:
-            self.dialog = Z5RankmapLoaderDialog(self.iface, self.output_data, self.on_rankmap_destroyed)
+    def show_load_dialog(self):
+        self.dialog = Z5RankmapLoaderDialog(
+            self.iface,
+            self.output_data,
+            self.on_rankmap_added,
+            self.on_rankmap_destroyed
+        )
         self.dialog.show()
 
+    def show_curves_dialog(self):
+        self.dialog = Z5PerformanceCurvesDialog(self.iface, self.output_data)
+        self.dialog.show()
 
 class Z5RankmapLoaderDialog(QDialog):
-    def __init__(self, iface, output_data, on_rankmap_destroyed):
+    def __init__(self, iface, output_data, on_rankmap_added, on_rankmap_destroyed):
         super().__init__()
         self.iface = iface
         self.output_data = output_data
+        self.on_rankmap_added = on_rankmap_added
         self.on_rankmap_destroyed = on_rankmap_destroyed
         self.z5_output_path = None
         self.name_extension_field = None
@@ -118,7 +142,7 @@ class Z5RankmapLoaderDialog(QDialog):
         self.open_button.setEnabled(True)
 
     def _handle_success(self) -> None:
-        QgsProject.instance().addMapLayer(self.output_data.rankmap)
+        self.on_rankmap_added()
         self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
         self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
         self.z5_output_path = None

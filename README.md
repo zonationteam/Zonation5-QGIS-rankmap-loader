@@ -8,4 +8,8 @@ This QGIS plugin adds Zonation 5 output rankmap as layer and shows associated pe
 3. Select "Install from ZIP", select downloaded zip-file and click "Install Plugin", accept warning
 
 ## Using the plugin
-There is "Load Zonation 5 Rankmap" button with Zonation icon in QGIS toolbar. At first the button takes you to window where you can select your Zonation 5 output folder. When "Open" button is clicked, rankmap is added as a layer to QGIS. When toolbar button is clicked again, performance curves are shown. You can add new rankmap and its performance curves by clicking "Reset" button in Performance curves window.
+There is "Load Zonation 5 Rankmap" button with Zonation icon in QGIS toolbar. This button takes you to a window where you can select your Zonation 5 output folder and give (optional) extension for its name. When "Open" button is clicked, rankmap is added to QGIS as as a layer.
+
+To view performance curves, right click layer name in Layers panel. From the context menu, select "Zonation 5" > "Show performance curves".
+
+You can add multiple Zonation 5 outputs at the same time. You can view performance curves from one output at a time.

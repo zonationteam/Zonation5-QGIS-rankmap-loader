@@ -1,6 +1,6 @@
 import os
 import inspect
-from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog
+from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit
 from PyQt5.QtGui import QIcon
 from qgis.core import QgsRasterLayer, QgsProject
 
@@ -81,6 +81,7 @@ class Z5RankmapLoaderDialog(QDialog):
         self.output_data = output_data
         self.on_rankmap_destroyed = on_rankmap_destroyed
         self.z5_output_path = None
+        self.name_extension_field = None
         self.open_button = None
         self.init_ui()
 
@@ -88,6 +89,7 @@ class Z5RankmapLoaderDialog(QDialog):
         self.setWindowTitle('Load Zonation 5 Rankmap')
 
         layout = QVBoxLayout()
+
         intro_label = QLabel("This plugin adds Zonation 5 output rankmap as a layer and show associated performance curves in QGIS.")
         layout.addWidget(intro_label)
 
@@ -95,6 +97,10 @@ class Z5RankmapLoaderDialog(QDialog):
         fdialog_button = QPushButton('Select Zonation output folder')
         fdialog_button.clicked.connect(self._on_output_folder_selection_clicked)
         layout.addWidget(fdialog_button)
+
+        layout.addWidget(QLabel('Rankmap name extension (optional):'))
+        self.name_extension_field = QLineEdit()
+        layout.addWidget(self.name_extension_field)
 
         self.open_button = QPushButton('Open')
         if self.z5_output_path is None:
@@ -111,15 +117,20 @@ class Z5RankmapLoaderDialog(QDialog):
         self.z5_output_path = output_folder_path
         self.open_button.setEnabled(True)
 
+    def _handle_success(self) -> None:
+        QgsProject.instance().addMapLayer(self.output_data.rankmap)
+        self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
+        self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
+        self.z5_output_path = None
+        self.name_extension_field.clear()
+        self.open_button.setEnabled(False)
+        self.destroy()
+
     def run(self):
-        self.output_data.set_output_folder(self.z5_output_path)
+        rankmap_name_extension = self.name_extension_field.text()
+        self.output_data.set_output_folder(self.z5_output_path, rankmap_name_extension)
         if self.output_data.rankmap.isValid():
-            QgsProject.instance().addMapLayer(self.output_data.rankmap)
-            self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
-            self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
-            self.z5_output_path = None
-            self.open_button.setEnabled(False)
-            self.destroy()
+            self._handle_success()
         else:
             self.iface.messageBar().pushCritical('Error', 'Invalid rankmap layer')
 

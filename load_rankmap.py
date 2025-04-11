@@ -80,6 +80,7 @@ class Zonation5LoaderPlugin:
             QAction(self.icon, 'Show performance curves'),
             self.output_data.rankmap
         )
+        self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
 
     def on_rankmap_destroyed(self):
         self.output_data.reset_data()
@@ -143,8 +144,6 @@ class Z5RankmapLoaderDialog(QDialog):
 
     def _handle_success(self) -> None:
         self.on_rankmap_added()
-        self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
-        self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
         self.z5_output_path = None
         self.name_extension_field.clear()
         self.open_button.setEnabled(False)
@@ -155,6 +154,7 @@ class Z5RankmapLoaderDialog(QDialog):
         self.output_data.set_output_folder(self.z5_output_path, rankmap_name_extension)
         if self.output_data.rankmap.isValid():
             self._handle_success()
+            self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
         else:
             self.iface.messageBar().pushCritical('Error', 'Invalid rankmap layer')
 

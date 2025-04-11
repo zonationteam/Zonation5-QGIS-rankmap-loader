@@ -11,23 +11,17 @@ from matplotlib import pyplot as plt, ticker
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 
 class Z5OutputData:
-    def __init__(self) -> None:
-        self.rankmap = None
+    def __init__(self, outputfolder_path: str) -> None:
         self.summary_data = None
         self.feature_data = None
+        self.set_output_folder(outputfolder_path)
 
     def __str__(self) -> str:
         sum_data_line = f"Summary data:\n{str(self.summary_data.head(2))}"
         feat_data_line = f"Feature data:\n{str(self.feature_data.head(2))}"
         return f"{sum_data_line},\n{feat_data_line}\n"
 
-    def set_output_folder(self, outputfolder_path: str, rankmap_name = '') -> None:
-        rlayer_name = 'rankmap'
-        if rankmap_name != '':
-            rlayer_name = f'{rlayer_name}_{rankmap_name}'
-        self.rankmap = QgsRasterLayer(f'{outputfolder_path}/rankmap.tif', rlayer_name)
-        if not self.rankmap.isValid():
-            return
+    def set_output_folder(self, outputfolder_path: str) -> None:
         self.summary_data = pd.read_csv(
             f"{outputfolder_path}/summary_curves.csv",
             sep=' '
@@ -37,11 +31,6 @@ class Z5OutputData:
             sep=' '
         ).iloc[:, :-1] # Because this file contains whitespaces at the end of each row
 
-    def reset_data(self) -> None:
-        self.rankmap = None
-        self.summary_data = None
-        self.feature_data = None
-
 
 class Zonation5LoaderPlugin:
     def __init__(self, iface):
@@ -50,7 +39,7 @@ class Zonation5LoaderPlugin:
         self.load_action = None
         self.context_menu_action = None
         self.dialog = None
-        self.output_data = Z5OutputData()
+        self.layers = {}
 
     def initGui(self):
         self.icon = QIcon(os.path.join(os.path.join(cmd_folder, 'icon.ico')))
@@ -66,44 +55,57 @@ class Zonation5LoaderPlugin:
             QgsMapLayerType.RasterLayer,
             allLayers=True
         )
-        self.context_menu_action.triggered.connect(self.show_curves_dialog)
-
 
     def unload(self):
         self.iface.removeToolBarIcon(self.load_action)
         self.iface.removeCustomActionForLayerType(self.context_menu_action)
         del self.load_action
 
-    def on_rankmap_added(self):
-        QgsProject.instance().addMapLayer(self.output_data.rankmap)
+    def add_rankmap(self, z5_output_path, rankmap_name_extension) -> bool:
+        rlayer_name = 'rankmap'
+        if rankmap_name_extension != '':
+            rlayer_name = f'{rlayer_name}_{rankmap_name_extension}'
+        rankmap = QgsRasterLayer(f'{z5_output_path}/rankmap.tif', rlayer_name)
+        if not rankmap.isValid():
+            return False
+        rankmap_layer = QgsProject.instance().addMapLayer(rankmap)
         self.iface.addCustomActionForLayer(
             QAction(self.icon, 'Show performance curves'),
-            self.output_data.rankmap
+            rankmap_layer
         )
-        self.output_data.rankmap.destroyed.connect(self.on_rankmap_destroyed)
+        self.context_menu_action.triggered.connect(self.show_curves_dialog)
+        rankmap_layer.destroyed.connect(lambda: self.on_rankmap_destroyed(rankmap_layer))
 
-    def on_rankmap_destroyed(self):
-        self.output_data.reset_data()
+        output_data = Z5OutputData(z5_output_path)
+
+        self.layers[rankmap_layer.id] = output_data
+        return True
+
+    def on_rankmap_destroyed(self, rankmap_layer):
+        self.layers.pop(rankmap_layer.id)
 
     def show_load_dialog(self):
         self.dialog = Z5RankmapLoaderDialog(
             self.iface,
-            self.output_data,
-            self.on_rankmap_added,
+            self.add_rankmap,
             self.on_rankmap_destroyed
         )
         self.dialog.show()
 
     def show_curves_dialog(self):
-        self.dialog = Z5PerformanceCurvesDialog(self.iface, self.output_data)
+        active_layer = self.iface.activeLayer()
+        if active_layer.id not in self.layers:
+            self.iface.messageBar().pushCritical('Error', 'Layer has no associated performance curves data')
+            return
+        self.dialog.destroy()
+        self.dialog = Z5PerformanceCurvesDialog(self.iface, self.layers[active_layer.id])
         self.dialog.show()
 
 class Z5RankmapLoaderDialog(QDialog):
-    def __init__(self, iface, output_data, on_rankmap_added, on_rankmap_destroyed):
+    def __init__(self, iface, add_rankmap, on_rankmap_destroyed):
         super().__init__()
         self.iface = iface
-        self.output_data = output_data
-        self.on_rankmap_added = on_rankmap_added
+        self.add_rankmap = add_rankmap
         self.on_rankmap_destroyed = on_rankmap_destroyed
         self.z5_output_path = None
         self.name_extension_field = None
@@ -142,25 +144,20 @@ class Z5RankmapLoaderDialog(QDialog):
         self.z5_output_path = output_folder_path
         self.open_button.setEnabled(True)
 
-    def _handle_success(self) -> None:
-        self.on_rankmap_added()
-        self.z5_output_path = None
-        self.name_extension_field.clear()
-        self.open_button.setEnabled(False)
-        self.destroy()
-
     def run(self):
         rankmap_name_extension = self.name_extension_field.text()
-        self.output_data.set_output_folder(self.z5_output_path, rankmap_name_extension)
-        if self.output_data.rankmap.isValid():
-            self._handle_success()
+        if self.add_rankmap(self.z5_output_path, rankmap_name_extension):
+            self.z5_output_path = None
+            self.name_extension_field.clear()
+            self.open_button.setEnabled(False)
+            self.destroy()
             self.iface.messageBar().pushSuccess('Success', 'Rankmap layer loaded')
         else:
             self.iface.messageBar().pushCritical('Error', 'Invalid rankmap layer')
 
 
 class Z5PerformanceCurvesDialog(QDialog):
-    def __init__(self, iface, output_data):
+    def __init__(self, iface, output_data: Z5OutputData):
         super().__init__()
         self.iface = iface
         self.output_data = output_data

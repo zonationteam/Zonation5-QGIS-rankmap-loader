@@ -1,7 +1,8 @@
 import os
 import inspect
-from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit
+from PyQt5.QtWidgets import QAction, QDialog, QVBoxLayout, QLabel, QPushButton, QLineEdit, QFormLayout
 from PyQt5.QtGui import QIcon
+from qgis.gui import QgsFileWidget
 from qgis.core import QgsRasterLayer, QgsProject, QgsMapLayerType
 
 import pandas as pd
@@ -107,41 +108,43 @@ class Z5RankmapLoaderDialog(QDialog):
         self.iface = iface
         self.add_rankmap = add_rankmap
         self.on_rankmap_destroyed = on_rankmap_destroyed
+        self.folder_widget = QgsFileWidget()
+        self.name_extension_field = QLineEdit()
+        self.open_button = QPushButton('Open')
         self.z5_output_path = None
-        self.name_extension_field = None
-        self.open_button = None
+
+        self.setMinimumSize(600, 120)
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle('Load Zonation 5 Rankmap')
 
-        layout = QVBoxLayout()
+        layout = QFormLayout()
 
-        intro_label = QLabel("This plugin adds Zonation 5 output rankmap as a layer and show associated performance curves in QGIS.")
-        layout.addWidget(intro_label)
+        layout.addRow(QLabel("Add Zonation 5 output rankmap as a layer."))
 
-        layout.addWidget(QLabel('Zonation output folder path:'))
-        fdialog_button = QPushButton('Select Zonation output folder')
-        fdialog_button.clicked.connect(self._on_output_folder_selection_clicked)
-        layout.addWidget(fdialog_button)
+        self.folder_widget.setDialogTitle('Open Zonation 5 output folder')
+        self.folder_widget.setStorageMode(QgsFileWidget.StorageMode.GetDirectory)
+        self.folder_widget.fileChanged.connect(self._on_output_folder_selection_changes)
+        layout.addRow(
+            QLabel('Zonation output folder path:'),
+            self.folder_widget
+        )
 
-        layout.addWidget(QLabel('Rankmap name extension (optional):'))
-        self.name_extension_field = QLineEdit()
-        layout.addWidget(self.name_extension_field)
+        layout.addRow(
+            QLabel('Rankmap name extension (optional):'),
+            self.name_extension_field
+        )
 
-        self.open_button = QPushButton('Open')
         if self.z5_output_path is None:
             self.open_button.setEnabled(False)
         self.open_button.clicked.connect(self.run)
-        layout.addWidget(self.open_button)
+        layout.addRow(self.open_button)
 
         self.setLayout(layout)
 
-    def _on_output_folder_selection_clicked(self) -> None:
-        output_folder_path = QFileDialog.getExistingDirectory(
-            self, 'Open folder'
-        )
-        self.z5_output_path = output_folder_path
+    def _on_output_folder_selection_changes(self):
+        self.z5_output_path = self.folder_widget.filePath()
         self.open_button.setEnabled(True)
 
     def run(self):

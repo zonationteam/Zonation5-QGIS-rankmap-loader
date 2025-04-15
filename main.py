@@ -16,7 +16,8 @@ class Zonation5RankmapLoaderPlugin:
         self.icon = None
         self.load_action = None
         self.context_menu_action = None
-        self.dialog = None
+        self.load_dialog = None
+        self.curves_dialog = None
         self.layers = {}
 
     def initGui(self):
@@ -63,18 +64,17 @@ class Zonation5RankmapLoaderPlugin:
         self.layers.pop(rankmap_layer.id)
 
     def show_load_dialog(self):
-        self.dialog = Z5RankmapLoaderDialog(
+        self.load_dialog = Z5RankmapLoaderDialog(
             self.iface,
             self.add_rankmap,
             self.on_rankmap_destroyed
         )
-        self.dialog.show()
+        self.load_dialog.show()
 
     def show_curves_dialog(self):
         active_layer = self.iface.activeLayer()
         if active_layer.id not in self.layers:
             self.iface.messageBar().pushCritical('Error', 'Layer has no associated performance curves data')
             return
-        self.dialog.destroy()
-        self.dialog = Z5PerformanceCurvesDialog(self.iface, self.layers[active_layer.id])
-        self.dialog.show()
+        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, self.layers[active_layer.id])
+        self.curves_dialog.show()

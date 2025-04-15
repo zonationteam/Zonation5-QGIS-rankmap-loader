@@ -1,6 +1,6 @@
 import os
 import inspect
-from PyQt5.QtWidgets import QAction
+from PyQt5.QtWidgets import QAction, QMenu, QToolButton
 from PyQt5.QtGui import QIcon
 from qgis.core import QgsRasterLayer, QgsProject, QgsMapLayerType
 
@@ -14,7 +14,7 @@ class Zonation5RankmapLoaderPlugin:
     def __init__(self, iface):
         self.iface = iface
         self.icon = None
-        self.load_action = None
+        self.toolbar_button_action = None
         self.context_menu_action = None
         self.load_dialog = None
         self.curves_dialog = None
@@ -22,9 +22,23 @@ class Zonation5RankmapLoaderPlugin:
     def initGui(self):
         self.icon = QIcon(os.path.join(os.path.join(cmd_folder, 'icon.ico')))
 
-        self.load_action = QAction(self.icon, 'Load Zonation 5 Rankmap', self.iface.mainWindow())
-        self.iface.addToolBarIcon(self.load_action)
-        self.load_action.triggered.connect(self.show_load_dialog)
+        load_action = QAction(self.icon, 'Load Zonation 5 Rankmap', self.iface.mainWindow())
+        show_dynamic_action = QAction(self.icon, 'Show performance curves', self.iface.mainWindow())
+
+        popupMenu = QMenu(self.iface.mainWindow())
+        popupMenu.addAction(load_action)
+        popupMenu.addAction(show_dynamic_action)
+
+        toolButton = QToolButton()
+
+        toolButton.setMenu(popupMenu)
+        toolButton.setDefaultAction(load_action)
+        toolButton.setPopupMode(QToolButton.MenuButtonPopup)
+
+        self.toolbar_button_action = self.iface.addToolBarWidget(toolButton)
+
+        load_action.triggered.connect(self.show_load_dialog)
+        show_dynamic_action.triggered.connect(self.show_curves_dialog)
 
         self.context_menu_action = QAction(self.icon, 'Show performance curves')
         self.iface.addCustomActionForLayerType(
@@ -36,9 +50,10 @@ class Zonation5RankmapLoaderPlugin:
         self.context_menu_action.triggered.connect(self.show_curves_dialog)
 
     def unload(self):
-        self.iface.removeToolBarIcon(self.load_action)
+        self.iface.removeToolBarIcon(self.toolbar_button_action)
         self.iface.removeCustomActionForLayerType(self.context_menu_action)
-        del self.load_action
+        del self.toolbar_button_action
+        del self.context_menu_action
 
     def add_rankmap(self, z5_output_path, rankmap_name_extension) -> bool:
         rlayer_name = 'rankmap'
@@ -62,8 +77,5 @@ class Zonation5RankmapLoaderPlugin:
 
     def show_curves_dialog(self):
         active_layer = self.iface.activeLayer()
-        if not active_layer.customProperty('Z5_output_data'):
-            self.iface.messageBar().pushCritical('Error', 'Layer has no associated performance curves data')
-            return
         self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, active_layer)
         self.curves_dialog.show()

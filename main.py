@@ -33,6 +33,7 @@ class Zonation5RankmapLoaderPlugin:
             QgsMapLayerType.RasterLayer,
             allLayers=True
         )
+        self.context_menu_action.triggered.connect(self.show_curves_dialog)
 
     def unload(self):
         self.iface.removeToolBarIcon(self.load_action)
@@ -47,11 +48,6 @@ class Zonation5RankmapLoaderPlugin:
         if not rankmap.isValid():
             return False
         rankmap_layer = QgsProject.instance().addMapLayer(rankmap)
-        self.iface.addCustomActionForLayer(
-            QAction(self.icon, 'Show performance curves'),
-            rankmap_layer
-        )
-        self.context_menu_action.triggered.connect(self.show_curves_dialog)
 
         output_data = Z5OutputData(z5_output_path)
         rankmap_layer.setCustomProperty('Z5_output_data', output_data)

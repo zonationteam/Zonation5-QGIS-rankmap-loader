@@ -65,5 +65,5 @@ class Zonation5RankmapLoaderPlugin:
         if not active_layer.customProperty('Z5_output_data'):
             self.iface.messageBar().pushCritical('Error', 'Layer has no associated performance curves data')
             return
-        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, active_layer.customProperty('Z5_output_data'))
+        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, active_layer)
         self.curves_dialog.show()

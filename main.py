@@ -18,7 +18,6 @@ class Zonation5RankmapLoaderPlugin:
         self.context_menu_action = None
         self.load_dialog = None
         self.curves_dialog = None
-        self.layers = {}
 
     def initGui(self):
         self.icon = QIcon(os.path.join(os.path.join(cmd_folder, 'icon.ico')))
@@ -53,28 +52,22 @@ class Zonation5RankmapLoaderPlugin:
             rankmap_layer
         )
         self.context_menu_action.triggered.connect(self.show_curves_dialog)
-        rankmap_layer.destroyed.connect(lambda: self.on_rankmap_destroyed(rankmap_layer))
 
         output_data = Z5OutputData(z5_output_path)
-
-        self.layers[rankmap_layer.id] = output_data
+        rankmap_layer.setCustomProperty('Z5_output_data', output_data)
         return True
-
-    def on_rankmap_destroyed(self, rankmap_layer):
-        self.layers.pop(rankmap_layer.id)
 
     def show_load_dialog(self):
         self.load_dialog = Z5RankmapLoaderDialog(
             self.iface,
-            self.add_rankmap,
-            self.on_rankmap_destroyed
+            self.add_rankmap
         )
         self.load_dialog.show()
 
     def show_curves_dialog(self):
         active_layer = self.iface.activeLayer()
-        if active_layer.id not in self.layers:
+        if not active_layer.customProperty('Z5_output_data'):
             self.iface.messageBar().pushCritical('Error', 'Layer has no associated performance curves data')
             return
-        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, self.layers[active_layer.id])
+        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, active_layer.customProperty('Z5_output_data'))
         self.curves_dialog.show()

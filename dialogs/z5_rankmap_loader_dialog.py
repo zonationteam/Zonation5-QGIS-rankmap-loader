@@ -2,11 +2,10 @@ from PyQt5.QtWidgets import QDialog, QLabel, QPushButton, QLineEdit, QFormLayout
 from qgis.gui import QgsFileWidget
 
 class Z5RankmapLoaderDialog(QDialog):
-    def __init__(self, iface, add_rankmap, on_rankmap_destroyed):
+    def __init__(self, iface, add_rankmap):
         super().__init__()
         self.iface = iface
         self.add_rankmap = add_rankmap
-        self.on_rankmap_destroyed = on_rankmap_destroyed
         self.folder_widget = QgsFileWidget()
         self.name_extension_field = QLineEdit()
         self.open_button = QPushButton('Open')

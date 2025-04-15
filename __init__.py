@@ -1,4 +1,4 @@
-from .load_rankmap import Zonation5LoaderPlugin
+from .main import Zonation5RankmapLoaderPlugin
 
 def classFactory(iface):
-    return Zonation5LoaderPlugin(iface)
+    return Zonation5RankmapLoaderPlugin(iface)

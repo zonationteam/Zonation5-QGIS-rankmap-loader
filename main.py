@@ -23,11 +23,11 @@ class Zonation5RankmapLoaderPlugin:
         self.icon = QIcon(os.path.join(os.path.join(cmd_folder, 'icon.ico')))
 
         load_action = QAction(self.icon, 'Load Zonation 5 Rankmap', self.iface.mainWindow())
-        show_dynamic_action = QAction(self.icon, 'Show performance curves', self.iface.mainWindow())
+        show_curves_action = QAction(self.icon, 'Show performance curves', self.iface.mainWindow())
 
         popupMenu = QMenu(self.iface.mainWindow())
         popupMenu.addAction(load_action)
-        popupMenu.addAction(show_dynamic_action)
+        popupMenu.addAction(show_curves_action)
 
         toolButton = QToolButton()
 
@@ -38,7 +38,7 @@ class Zonation5RankmapLoaderPlugin:
         self.toolbar_button_action = self.iface.addToolBarWidget(toolButton)
 
         load_action.triggered.connect(self.show_load_dialog)
-        show_dynamic_action.triggered.connect(self.show_curves_dialog)
+        show_curves_action.triggered.connect(self.show_curves_dialog)
 
         self.context_menu_action = QAction(self.icon, 'Show performance curves')
         self.iface.addCustomActionForLayerType(
@@ -76,6 +76,5 @@ class Zonation5RankmapLoaderPlugin:
         self.load_dialog.show()
 
     def show_curves_dialog(self):
-        active_layer = self.iface.activeLayer()
-        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface, active_layer)
+        self.curves_dialog = Z5PerformanceCurvesDialog(self.iface)
         self.curves_dialog.show()
